@@ -6,66 +6,51 @@ const VideoPlayer = () => {
   const [videoData, setVideoData] = useState(null);
   const [isMuted, setIsMuted] = useState(true);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const hlsInstance = useRef(null); // persist HLS instance
+  const hlsInstance = useRef(null);
 
-  // Poll for stream status
   useEffect(() => {
-    const poll = setInterval(async () => {
+    const fetchStream = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/current-stream');
-        const result = await res.json();
+        const res1 = await fetch('http://localhost:3001/api/current-stream');
+        const result1 = await res1.json();
 
-        if (result.video && result.offset !== undefined) {
-          if (!videoData || videoData.video !== result.video) {
-            // New stream started
-            const res2 = await fetch(`http://localhost:3001/api/manifest/${result.video}?offset=${result.offset}`);
-            const result2 = await res2.json();
-            setVideoData({ manifest: result2.manifest, offset: result2.offset, video: result.video });
-            setError(null);
-            setLoading(false);
-          }
-        } else {
-          // Stream has ended
-          if (videoData) {
-            setVideoData(null);
-            setError("⛔ Stream has ended");
-            setLoading(false);
-            if (hlsInstance.current) {
-              hlsInstance.current.destroy();
-              hlsInstance.current = null;
-            }
-          }
+        if (!result1.video || result1.offset === undefined) {
+          setError("Stream not available");
+          return;
         }
+
+        const res2 = await fetch(`http://localhost:3001/api/manifest/${result1.video}?offset=${result1.offset}`);
+        const result2 = await res2.json();
+
+        setVideoData({
+          video: result1.video,
+          manifest: result2.manifest,
+          offset: result2.offset
+        });
       } catch (err) {
-        console.error('Polling error:', err);
-        setError("Stream fetch error.");
-        setVideoData(null);
+        setError("Stream load error");
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(poll);
-  }, [videoData]);
+    fetchStream();
+  }, []);
 
-  // Setup HLS player when new videoData arrives
   useEffect(() => {
     if (videoData?.manifest && Hls.isSupported()) {
       const video = videoRef.current;
-
       if (hlsInstance.current) {
         hlsInstance.current.destroy();
       }
 
       const hls = new Hls();
       hlsInstance.current = hls;
-
       hls.loadSource(videoData.manifest);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.currentTime = videoData.offset;
-        video.muted = true;
-        video.play().catch(err => console.error('Autoplay failed:', err));
+        video.muted = isMuted;
+        video.play().catch(err => console.error('Autoplay failed', err));
       });
 
       return () => {
@@ -82,11 +67,11 @@ const VideoPlayer = () => {
     }
   };
 
-  if (loading) return <p>⏳ Waiting for stream...</p>;
   if (error) return <p style={{ color: 'red' }}>⚠️ {error}</p>;
+  if (!videoData) return <p>⏳ Waiting for stream...</p>;
 
   return (
-    <div onContextMenu={(e) => e.preventDefault()}>
+    <div onContextMenu={e => e.preventDefault()}>
       <h3>🎥 StreamSync Player</h3>
       <div style={{ position: 'relative' }}>
         <video

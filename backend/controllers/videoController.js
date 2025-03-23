@@ -1,6 +1,6 @@
 const redis = require('../services/redisService');
 
-// ✅ GET /api/current-stream → { video, offset }
+// GET /api/current-stream → returns current stream video & offset
 exports.getCurrentStream = async (req, res) => {
   try {
     const video = await redis.get('streaming');
@@ -20,7 +20,7 @@ exports.getCurrentStream = async (req, res) => {
   }
 };
 
-// ✅ GET /api/manifest/:videoId?offset=123
+// GET /api/manifest/:videoId?offset=123
 exports.getManifestURL = (req, res) => {
   const videoId = req.params.videoId;
   const offset = req.query.offset;
@@ -31,4 +31,31 @@ exports.getManifestURL = (req, res) => {
 
   const manifestUrl = `http://localhost:3001/videos/${videoId}/240p/playlist.m3u8`;
   res.json({ manifest: manifestUrl, offset: Number(offset) });
+};
+
+// SSE endpoint: stream-status-sse
+exports.streamStatusSSE = async (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+
+  let lastVideo = null;
+
+  const sendStatus = async () => {
+    const currentVideo = await redis.get('streaming');
+    if (currentVideo !== lastVideo) {
+      res.write(`data: ${JSON.stringify({ video: currentVideo })}\n\n`);
+      lastVideo = currentVideo;
+    }
+  };
+
+  await sendStatus();
+  const interval = setInterval(sendStatus, 2000);
+
+  req.on('close', () => {
+    clearInterval(interval);
+    res.end();
+  });
 };
