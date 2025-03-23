@@ -1,79 +1,89 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 
-const VideoPlayer = ({ userId }) => {
-  const videoRef = useRef();
-  const [videoData, setVideoData] = useState({ manifest: null, offset: 0 });
-  const playbackStartTime = useRef(null);
-  const [isMuted, setIsMuted] = useState(true); // Start muted for autoplay
+const VideoPlayer = () => {
+  const videoRef = useRef(null);
+  const [videoData, setVideoData] = useState(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const hlsInstance = useRef(null); // persist HLS instance
 
-  // Fetch manifest and offset
+  // Poll for stream status
   useEffect(() => {
-    async function loadManifest() {
+    const poll = setInterval(async () => {
       try {
-        const res1 = await fetch(`http://localhost:3001/api/current-video?user_id=${userId}`);
-        const result1 = await res1.json();
+        const res = await fetch('http://localhost:3001/api/current-stream');
+        const result = await res.json();
 
-        if (!result1.video || result1.offset === undefined) {
-          console.error("Invalid data from backend", result1);
-          return;
+        if (result.video && result.offset !== undefined) {
+          if (!videoData || videoData.video !== result.video) {
+            // New stream started
+            const res2 = await fetch(`http://localhost:3001/api/manifest/${result.video}?offset=${result.offset}`);
+            const result2 = await res2.json();
+            setVideoData({ manifest: result2.manifest, offset: result2.offset, video: result.video });
+            setError(null);
+            setLoading(false);
+          }
+        } else {
+          // Stream has ended
+          if (videoData) {
+            setVideoData(null);
+            setError("⛔ Stream has ended");
+            setLoading(false);
+            if (hlsInstance.current) {
+              hlsInstance.current.destroy();
+              hlsInstance.current = null;
+            }
+          }
         }
-
-        const res2 = await fetch(`http://localhost:3001/api/manifest/${result1.video}?offset=${result1.offset}`);
-        const result2 = await res2.json();
-        setVideoData({ manifest: result2.manifest, offset: result1.offset });
       } catch (err) {
-        console.error("Failed to fetch manifest", err);
+        console.error('Polling error:', err);
+        setError("Stream fetch error.");
+        setVideoData(null);
       }
+    }, 1000);
+
+    return () => clearInterval(poll);
+  }, [videoData]);
+
+  // Setup HLS player when new videoData arrives
+  useEffect(() => {
+    if (videoData?.manifest && Hls.isSupported()) {
+      const video = videoRef.current;
+
+      if (hlsInstance.current) {
+        hlsInstance.current.destroy();
+      }
+
+      const hls = new Hls();
+      hlsInstance.current = hls;
+
+      hls.loadSource(videoData.manifest);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.currentTime = videoData.offset;
+        video.muted = true;
+        video.play().catch(err => console.error('Autoplay failed:', err));
+      });
+
+      return () => {
+        hls.destroy();
+        hlsInstance.current = null;
+      };
     }
+  }, [videoData]);
 
-    loadManifest();
-  }, [userId]);
-
-  // Toggle mute state
   const toggleMute = () => {
-    setIsMuted(!isMuted);
+    setIsMuted(prev => !prev);
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
     }
   };
 
-  // Initialize HLS and setup seeking prevention
-  useEffect(() => {
-    if (videoData.manifest && Hls.isSupported()) {
-      const hls = new Hls();
-      let video = videoRef.current;
-      
-      hls.loadSource(videoData.manifest);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        playbackStartTime.current = Date.now() - videoData.offset * 1000;
-        video.currentTime = videoData.offset;
-        
-        // Autoplay with muted audio
-        video.muted = true;
-        video.play().catch(err => console.error('Autoplay failed:', err));
-      });
-
-      // Prevent seeking
-      const preventSeek = (e) => {
-        const expectedTime = (Date.now() - playbackStartTime.current) / 1000;
-        if (Math.abs(video.currentTime - expectedTime) > 1) {
-          video.currentTime = expectedTime;
-        }
-      };
-
-      video.addEventListener('seeking', preventSeek);
-      video.addEventListener('timeupdate', preventSeek);
-
-      return () => {
-        hls.destroy();
-        video.removeEventListener('seeking', preventSeek);
-        video.removeEventListener('timeupdate', preventSeek);
-      };
-    }
-  }, [videoData]);
+  if (loading) return <p>⏳ Waiting for stream...</p>;
+  if (error) return <p style={{ color: 'red' }}>⚠️ {error}</p>;
 
   return (
     <div onContextMenu={(e) => e.preventDefault()}>

@@ -1,12 +1,25 @@
 import React from 'react';
-import VideoPlayer from './components/VideoPlayer';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+
+// Protect route
+const PrivateRoute = ({ children }) => {
+  const user = localStorage.getItem('userId');
+  return user ? children : <Navigate to="/login" />;
+};
 
 function App() {
   return (
-    <div>
-      <h2>StreamSync Local</h2>
-      <VideoPlayer userId="user123" />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </Router>
   );
 }
 
