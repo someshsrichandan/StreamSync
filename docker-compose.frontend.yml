@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build: ./frontend
+    container_name: streamsync-frontend
+    ports:
+      - "5173:5173" # or "3000:3000" if you're using CRA
+    networks:
+      - streamsync-network
+    environment:
+      - VITE_BACKEND_URL=http://localhost:3001
+
+networks:
+  streamsync-network:
+    external: true

@@ -8,24 +8,25 @@ const VideoPlayer = () => {
   const [error, setError] = useState(null);
   const hlsInstance = useRef(null);
 
+  const minioBaseUrl = import.meta.env.VITE_MINIO_BASE_URL;
+
   useEffect(() => {
     const fetchStream = async () => {
       try {
-        const res1 = await fetch('http://localhost:3001/api/current-stream');
-        const result1 = await res1.json();
+        const res = await fetch('http://localhost:3001/api/current-stream');
+        const result = await res.json();
 
-        if (!result1.video || result1.offset === undefined) {
+        if (!result.video || result.offset === undefined) {
           setError("Stream not available");
           return;
         }
 
-        const res2 = await fetch(`http://localhost:3001/api/manifest/${result1.video}?offset=${result1.offset}`);
-        const result2 = await res2.json();
+        const manifestUrl = `${minioBaseUrl}/videos/${result.video}/240p/playlist.m3u8`;
 
         setVideoData({
-          video: result1.video,
-          manifest: result2.manifest,
-          offset: result2.offset
+          video: result.video,
+          manifest: manifestUrl,
+          offset: result.offset
         });
       } catch (err) {
         setError("Stream load error");
@@ -33,22 +34,27 @@ const VideoPlayer = () => {
     };
 
     fetchStream();
-  }, []);
+  }, [minioBaseUrl]);
 
   useEffect(() => {
     if (videoData?.manifest && Hls.isSupported()) {
       const video = videoRef.current;
+
       if (hlsInstance.current) {
         hlsInstance.current.destroy();
       }
 
       const hls = new Hls();
       hlsInstance.current = hls;
-      hls.loadSource(videoData.manifest);
+
       hls.attachMedia(video);
+      hls.loadSource(videoData.manifest);
+
+      hls.on(Hls.Events.LEVEL_LOADED, () => {
+        video.currentTime = videoData.offset;
+      });
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.currentTime = videoData.offset;
         video.muted = isMuted;
         video.play().catch(err => console.error('Autoplay failed', err));
       });
@@ -71,7 +77,7 @@ const VideoPlayer = () => {
   if (!videoData) return <p>⏳ Waiting for stream...</p>;
 
   return (
-    <div onContextMenu={e => e.preventDefault()}>
+    <div onContextMenu={(e) => e.preventDefault()}>
       <h3>🎥 StreamSync Player</h3>
       <div style={{ position: 'relative' }}>
         <video
