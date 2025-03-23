@@ -73,34 +73,24 @@ const VideoPlayer = () => {
     }
   };
 
-  if (error) return <p style={{ color: 'red' }}>⚠️ {error}</p>;
-  if (!videoData) return <p>⏳ Waiting for stream...</p>;
+  if (error) return <p style={styles.errorMessage}>⚠️ {error}</p>;
+  if (!videoData) return <p style={styles.loadingMessage}>⏳ Waiting for stream...</p>;
 
   return (
-    <div onContextMenu={(e) => e.preventDefault()}>
-      <h3>🎥 StreamSync Player</h3>
-      <div style={{ position: 'relative' }}>
+    <div onContextMenu={(e) => e.preventDefault()} style={styles.container}>
+      <h3 style={styles.title}>🎥 StreamSync Player</h3>
+      <div style={styles.videoWrapper}>
         <video
           ref={videoRef}
           autoPlay
           muted={isMuted}
           controls={false}
           width="720"
-          style={{ cursor: 'pointer' }}
+          style={styles.video}
         />
         <button 
           onClick={toggleMute}
-          style={{
-            position: 'absolute',
-            bottom: '20px',
-            right: '20px',
-            background: 'rgba(0,0,0,0.5)',
-            border: 'none',
-            borderRadius: '4px',
-            color: 'white',
-            padding: '8px',
-            cursor: 'pointer'
-          }}
+          style={styles.muteButton}
         >
           {isMuted ? '🔇 Unmute' : '🔊 Mute'}
         </button>
@@ -110,3 +100,55 @@ const VideoPlayer = () => {
 };
 
 export default VideoPlayer;
+
+const styles = {
+  container: {
+    maxWidth: '800px',
+    margin: '0 auto',
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: '24px',
+    color: '#333',
+    marginBottom: '20px',
+  },
+  videoWrapper: {
+    position: 'relative',
+    display: 'inline-block',
+  },
+  video: {
+    borderRadius: '8px',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+    cursor: 'pointer',
+  },
+  muteButton: {
+    position: 'absolute',
+    bottom: '20px',
+    right: '20px',
+    background: 'rgba(0, 0, 0, 0.7)',
+    border: 'none',
+    borderRadius: '4px',
+    color: 'white',
+    padding: '8px 12px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'background 0.3s ease',
+  },
+  muteButtonHover: {
+    background: 'rgba(0, 0, 0, 0.9)',
+  },
+  errorMessage: {
+    color: 'red',
+    fontSize: '18px',
+    textAlign: 'center',
+    marginTop: '20px',
+  },
+  loadingMessage: {
+    color: '#666',
+    fontSize: '18px',
+    textAlign: 'center',
+    marginTop: '20px',
+  },
+};
