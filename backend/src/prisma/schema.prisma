@@ -18,5 +18,7 @@ model User {
   name String?
   email String @unique
   password String
+  admin Boolean @default(false)
   createdAt DateTime @default(now())
 }
+

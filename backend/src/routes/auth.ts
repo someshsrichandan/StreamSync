@@ -28,6 +28,7 @@ authRouter.post("/signup", async (req:Request, res:Response):Promise<any> => {
         name,
         email,
         password: hashPassword,
+        admin: false,
       },
     });
 
@@ -53,8 +54,12 @@ authRouter.post("/login", async (req:Request, res:Response):Promise<any> => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+    if(user.admin) {
+      return res.status(403).json({ message: "You are not authorized to access this resource" });
+    }
+
     // Generate JWT token here (if needed)
-    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "1d" });
+    const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "7d" });
     res.cookie("token", token, {
       expires: new Date(Date.now() + 86400000),
     });

@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import authRouter from "./routes/auth";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import adminAuthRouter from "./routes/adminAuth";
 
 dotenv.config();
 const app:Express = express();
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/" , authRouter)
+app.use("/api/admin/" , adminAuthRouter)
 
 
 app.listen(PORT, () => {
